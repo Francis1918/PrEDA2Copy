@@ -3,6 +3,7 @@ from tkinter import ttk, messagebox
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import networkx as nx
+import matplotlib.patches as mpatches
 from Graph import Graph
 from BFS import bfs_shortest_path, bfs_tree
 from DFS import dfs_path, dfs_tree
@@ -102,12 +103,101 @@ class GraphApp:
         nx.draw_networkx_edges(G_nx, pos, ax=ax, edge_color='gray', alpha=0.5,
                                arrows=True, arrowstyle='-|>', arrowsize=20, connectionstyle='arc3,rad=0.2')
 
-        if ruta:
-            aristas_ruta = list(zip(ruta, ruta[1:]))
-            nx.draw_networkx_nodes(G_nx, pos, ax=ax, nodelist=ruta, node_color=color, node_size=800)
-            nx.draw_networkx_edges(G_nx, pos, ax=ax, edgelist=aristas_ruta, edge_color=color, width=2,
-                                   arrows=True, arrowstyle='-|>', arrowsize=20, connectionstyle='arc3,rad=0.2')
+        # Leyenda para el gráfico
+        legend_elements = [
+            mpatches.Patch(color='lightgray', label='Nodos del grafo'),
+            mpatches.Patch(color='gray', label='Aristas del grafo')
+        ]
 
+        if ruta:
+            # Verificar tipo de datos de ruta y manejar apropiadamente
+            if isinstance(ruta, dict):
+                # Si es un árbol en formato de diccionario {nodo: padre}
+                aristas_ruta = []
+                nodos_validos = []
+                nodo_raiz = self.tree_root_node.get()
+
+                # Destacar el nodo raíz con un color y tamaño especial
+                if nodo_raiz in G_nx:
+                    nx.draw_networkx_nodes(G_nx, pos, ax=ax, nodelist=[nodo_raiz],
+                                          node_color='gold', node_size=1200)
+                    legend_elements.append(mpatches.Patch(color='gold', label=f'Nodo raíz: {nodo_raiz}'))
+
+                for hijo, padre in ruta.items():
+                    # Solo agregar nodos válidos que existan en el grafo
+                    if hijo in G_nx and hijo != nodo_raiz:  # Excluir nodo raíz que ya se pintó
+                        nodos_validos.append(hijo)
+
+                    # Solo agregar aristas válidas donde padre no sea None, ni vacío, y ambos existan en el grafo
+                    if (padre is not None and padre != () and hijo != () and
+                        isinstance(hijo, str) and isinstance(padre, str) and
+                        padre in G_nx and hijo in G_nx):
+                        aristas_ruta.append((padre, hijo))
+
+                # Dibujar nodos válidos (no raíz)
+                if nodos_validos:
+                    nx.draw_networkx_nodes(G_nx, pos, ax=ax, nodelist=nodos_validos,
+                                          node_color=color, node_size=800)
+                    legend_elements.append(mpatches.Patch(color=color, label='Nodos del árbol'))
+
+                # Dibujar aristas válidas con mayor grosor y contraste
+                if aristas_ruta:
+                    nx.draw_networkx_edges(G_nx, pos, ax=ax, edgelist=aristas_ruta,
+                                          edge_color=color, width=3, arrows=True,
+                                          alpha=0.9, arrowstyle='-|>', arrowsize=25,
+                                          connectionstyle='arc3,rad=0.2')
+                    legend_elements.append(mpatches.Patch(color=color, alpha=0.9,
+                                                        label='Aristas del árbol'))
+
+            elif isinstance(ruta, list):
+                # Si es una ruta en formato de lista [nodo1, nodo2, ...]
+                if len(ruta) > 1:
+                    # Verificar que todos los nodos existan en el grafo
+                    nodos_validos = [nodo for nodo in ruta if nodo in G_nx]
+                    aristas_ruta = []
+
+                    # Destacar nodo inicio y destino
+                    if nodos_validos:
+                        inicio = nodos_validos[0]
+                        fin = nodos_validos[-1]
+                        nx.draw_networkx_nodes(G_nx, pos, ax=ax, nodelist=[inicio],
+                                              node_color='lime', node_size=1000)
+                        nx.draw_networkx_nodes(G_nx, pos, ax=ax, nodelist=[fin],
+                                              node_color='red', node_size=1000)
+
+                        legend_elements.extend([
+                            mpatches.Patch(color='lime', label=f'Nodo inicio: {inicio}'),
+                            mpatches.Patch(color='red', label=f'Nodo destino: {fin}')
+                        ])
+
+                    # Nodos intermedios
+                    nodos_intermedios = nodos_validos[1:-1] if len(nodos_validos) > 2 else []
+                    if nodos_intermedios:
+                        nx.draw_networkx_nodes(G_nx, pos, ax=ax, nodelist=nodos_intermedios,
+                                              node_color=color, node_size=800)
+                        legend_elements.append(mpatches.Patch(color=color, label='Nodos intermedios'))
+
+                    if len(nodos_validos) > 1:
+                        for i in range(len(nodos_validos) - 1):
+                            aristas_ruta.append((nodos_validos[i], nodos_validos[i+1]))
+
+                        nx.draw_networkx_edges(G_nx, pos, ax=ax, edgelist=aristas_ruta,
+                                              edge_color=color, width=3, arrows=True,
+                                              alpha=0.9, arrowstyle='-|>', arrowsize=25,
+                                              connectionstyle='arc3,rad=0.2')
+                        legend_elements.append(mpatches.Patch(color=color, alpha=0.9,
+                                                            label='Aristas de la ruta'))
+            else:
+                # Si es un conjunto u otro tipo de colección
+                nodos_validos = [nodo for nodo in ruta if nodo in G_nx]
+                if nodos_validos:
+                    nx.draw_networkx_nodes(G_nx, pos, ax=ax, nodelist=nodos_validos,
+                                          node_color=color, node_size=800)
+                    legend_elements.append(mpatches.Patch(color=color, label='Nodos visitados'))
+
+        # Añadir leyenda al gráfico en la parte inferior central
+        ax.legend(handles=legend_elements, loc='lower center', bbox_to_anchor=(0.5, -0.15),
+                 ncol=3, frameon=True, shadow=True)
         ax.set_title(titulo)
         ax.axis('off')
         canvas.draw()
